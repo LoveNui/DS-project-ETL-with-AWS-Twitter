@@ -1,0 +1,51 @@
+from tweepy.streaming import StreamListener
+from tweepy import OAuthHandler
+from tweepy import Stream
+import json
+import boto.dynamodb2
+import boto3
+from boto.dynamodb2.table import Table
+import time
+#Variables that contains the user credentials to access Twitter API
+consumer_key = 'fdsXW5VxoC0a6lDAaTtTkqH78'
+consumer_secret ='pulvr1mTQOSEKuiwTJihGzlxz9lQHIcIM5dVr7jTVDSeu7ayKF'
+access_token = '2225243816-MtBhl1nI5aMJJulzvQUiIcj50ZRk1Pp61cC0b2n'
+access_token_secret = 'qpfK4FAvPJjcSI8HvYrbbYc88UpNoTFpJ5sVSpJVRtuXn'
+
+
+#This is a basic listener that just prints received tweets to stdout.
+class StdOutListener(StreamListener):
+​
+    def on_data(self, data):
+​
+    def on_error(self, status):
+        print (status)
+​
+​
+if __name__ == '__main__':
+​
+    #This handles Twitter authetification and the connection to Twitter Streaming API
+    listener = StdOutListener()
+    auth = OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_token_secret)
+​
+    #tweets = Table('tweets_ft',connection=conn)
+    client = boto3.client('firehose', 
+                          region_name='us-east-1',
+                          aws_access_key_id='AKIAYET5B3LX2GAIS4BH',
+                          aws_secret_access_key='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' 
+                          )
+​
+    delivery_stream = 'twitter_stream'
+    #This line filter Twitter Streams to capture data by the keywords: 'python', 'javascript', 'ruby'
+    #stream.filter(track=['giletsjaunes'], stall_warnings=True)
+    while True:
+        try:
+            print('Twitter streaming...')
+            stream = Stream(auth, listener)
+            stream.filter(track=['giletsjaunes'], languages=['fr'], stall_warnings=True)
+        except Exception as e:
+            print(e)
+            print('Disconnected...')
+            time.sleep(5)
+            continue  

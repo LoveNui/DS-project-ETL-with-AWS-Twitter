@@ -1,0 +1,1 @@
+scp -i ~/Downloads/keyec2.pem script_python_twitter.py ec2-user@ec2-54-91-187-26.compute-1.amazonaws.com:/home/ec2-user/

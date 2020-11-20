@@ -1,0 +1,84 @@
+import os
+import hashlib
+import json
+import requests
+import boto3
+from requests_aws4auth import AWS4Auth
+from botocore.errorfactory import ClientError
+
+
+def create_hash(value):
+    sha = hashlib.md5()
+    sha.update(value.encode())
+    return sha.hexdigest()
+
+
+class ElasticSearchHelper(object):
+    def __init__(self, host):
+        credentials = boto3.Session().get_credentials()
+        region = boto3.Session().region_name
+        self.awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es', session_token=credentials.token)
+        self.host = host
+
+    def create_index(self, index_name):
+        settings = {
+            "settings" : {
+                "number_of_shards" : 1,
+                "number_of_replicas" : 1
+            }
+        }
+        headers = {"Content-Type": "application/json"}
+        url = self.host + '/' + index_name
+        response = requests.put(url, auth=self.awsauth, data=json.dumps(settings), headers=headers)
+        return response.content
+
+
+    def delete_all_index(self):
+        del_url = f'{self.host}/_all'
+        response = requests.delete(del_url, auth=self.awsauth, headers={"Content-Type": "application/json"})
+        return response.content
+
+    def insert_to_index(self, data, index):
+        es_url = f'{self.host}/{index}/_doc'
+        for message in data:
+            key = ''.join([str(message[c]) for c in ["tweet_id", "name", "screen_name", "created_at"]])
+            url = es_url + "/" + create_hash(key)
+            rs = requests.post(url, auth=self.awsauth, data=json.dumps(message), headers={"Content-Type": "application/json"})
+            print(rs.content)
+            
+
+class S3Helper(object):
+    def __init__(self, bucket):
+        self.client = boto3.client('s3')
+        self.bucket = bucket
+    
+    @staticmethod
+    def string_to_int(int_text):
+        try:
+            return int(int_text)
+        except ValueError:
+            return -1
+    
+    def read_tweet(self, key):
+        tweet_data = {}
+
+        try:
+            result = self.client.get_object(Bucket=self.bucket, Key=key)
+            tokens = str(result["Body"].read().decode()).split("\t")
+            if len(tokens) > 8:
+                tweet_data = {
+                    'tweet_id': tokens[0].replace("\n", "").strip(),
+                    'name': tokens[1].strip(),
+                    'screen_name': tokens[2].strip(),
+                    'full_text': tokens[3].strip(),
+                    'followers_count': self.string_to_int(tokens[4].strip()),
+                    'location': tokens[5].strip(),
+                    'geo': tokens[6].strip(),
+                    'created_at': tokens[7].strip()
+                }
+            else:
+                print("Wrong format: ", tokens)
+        except ClientError as e:
+            # Not found
+            print("ERROR: ", e)
+        return tweet_data
